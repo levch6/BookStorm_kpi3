@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
+  IsDateString,
   IsEnum,
   IsNotEmpty,
   IsString,
@@ -93,4 +94,43 @@ export class PaginatedOrdersResponseDto {
 
   @ApiProperty({ type: PaginationMetaDto })
   meta: PaginationMetaDto;
+}
+
+export class CreatePreOrderDto {
+  @ApiProperty({ example: 'b2c3d4e5-f6a7-8901-b2c3-d4e5f6a78901', format: 'uuid' })
+  @IsUUID()
+  bookId: string;
+
+  @ApiProperty({ example: '2026-10-15', description: 'ISO 8601 date' })
+  @IsDateString()
+  expectedReleaseDate: string;
+
+  @ApiProperty({ example: 'Kyiv, Nova Poshta #42' })
+  @IsString()
+  @IsNotEmpty()
+  deliveryBranch: string;
+
+  @ApiProperty({ enum: PaymentMethod, example: PaymentMethod.STRIPE })
+  @IsEnum(PaymentMethod)
+  paymentMethod: PaymentMethod;
+}
+
+export class PreOrderResponseDto {
+  @ApiProperty({ example: 'p1a2b3c4-d5e6-7890-p1a2-b3c4d5e67890' })
+  id: string;
+
+  @ApiProperty({ example: 'b2c3d4e5-f6a7-8901-b2c3-d4e5f6a78901' })
+  bookId: string;
+
+  @ApiProperty({ example: 'Dune Messiah' })
+  bookTitle: string;
+
+  @ApiProperty({ example: 'locked' })
+  status: 'locked';
+
+  @ApiProperty({ example: '2026-10-15' })
+  expectedReleaseDate: string;
+
+  @ApiProperty({ example: '2026-04-08T10:00:00.000Z' })
+  createdAt: string;
 }

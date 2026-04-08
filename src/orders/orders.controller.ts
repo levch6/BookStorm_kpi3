@@ -17,9 +17,11 @@ import {
 } from '@nestjs/swagger';
 import {
   CreateOrderDto,
+  CreatePreOrderDto,
   OrderResponseDto,
   OrderStatus,
   PaginatedOrdersResponseDto,
+  PreOrderResponseDto,
 } from '../dto/order.dto';
 import { ErrorResponseDto, MessageResponseDto } from '../dto/common.dto';
 
@@ -76,6 +78,10 @@ export class OrdersController {
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
   @ApiQuery({ name: 'status', required: false, enum: OrderStatus })
   @ApiQuery({ name: 'sort', required: false, type: String, example: 'createdAt:desc' })
+  @ApiQuery({ name: 'dateFrom', required: false, type: String, example: '2025-01-01', description: 'ISO 8601 date — filter orders created on or after this date' })
+  @ApiQuery({ name: 'dateTo', required: false, type: String, example: '2025-12-31', description: 'ISO 8601 date — filter orders created on or before this date' })
+  @ApiQuery({ name: 'minPrice', required: false, type: Number, description: 'Minimum total order price' })
+  @ApiQuery({ name: 'maxPrice', required: false, type: Number, description: 'Maximum total order price' })
   @ApiResponse({ status: 200, type: PaginatedOrdersResponseDto })
   @ApiResponse({ status: 401, type: ErrorResponseDto })
   listOrders(
@@ -83,10 +89,22 @@ export class OrdersController {
     @Query('limit') limit = 10,
     @Query('status') status?: OrderStatus,
     @Query('sort') sort?: string,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+    @Query('minPrice') minPrice?: number,
+    @Query('maxPrice') maxPrice?: number,
   ): PaginatedOrdersResponseDto {
-    const filtered = status
+    // Filtering logic (mock — in production: pass filters to repository query)
+    // dateFrom/dateTo: compare o.createdAt >= dateFrom && o.createdAt <= dateTo
+    // minPrice/maxPrice: compare o.totalPrice >= minPrice && o.totalPrice <= maxPrice
+    let filtered = status
       ? MOCK_ORDERS.filter((o) => o.status === status)
-      : MOCK_ORDERS;
+      : [...MOCK_ORDERS];
+
+    if (dateFrom) filtered = filtered.filter((o) => o.createdAt >= dateFrom);
+    if (dateTo) filtered = filtered.filter((o) => o.createdAt <= dateTo + 'T23:59:59.999Z');
+    if (minPrice !== undefined) filtered = filtered.filter((o) => o.totalPrice >= Number(minPrice));
+    if (maxPrice !== undefined) filtered = filtered.filter((o) => o.totalPrice <= Number(maxPrice));
 
     return {
       data: filtered,
@@ -134,6 +152,23 @@ export class OrdersController {
           unitPrice: 13.99,
         },
       ],
+    };
+  }
+
+  @Post('pre-order')
+  @ApiOperation({ summary: 'Create a pre-order for an upcoming book release' })
+  @ApiResponse({ status: 201, type: PreOrderResponseDto })
+  @ApiResponse({ status: 400, type: ErrorResponseDto })
+  @ApiResponse({ status: 401, type: ErrorResponseDto })
+  @ApiResponse({ status: 409, type: ErrorResponseDto })
+  createPreOrder(@Body() dto: CreatePreOrderDto): PreOrderResponseDto {
+    return {
+      id: 'p1a2b3c4-d5e6-7890-p1a2-b3c4d5e67890',
+      bookId: dto.bookId,
+      bookTitle: 'Dune Messiah',
+      status: 'locked',
+      expectedReleaseDate: dto.expectedReleaseDate,
+      createdAt: new Date().toISOString(),
     };
   }
 
