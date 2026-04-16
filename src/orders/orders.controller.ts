@@ -4,6 +4,9 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Inject,
+  Logger,
+  Optional,
   Param,
   Post,
   Query,
@@ -24,6 +27,9 @@ import {
   PreOrderResponseDto,
 } from '../dto/order.dto';
 import { ErrorResponseDto, MessageResponseDto } from '../dto/common.dto';
+import { ClientProxy } from '@nestjs/microservices';
+import { lastValueFrom } from 'rxjs';
+import { OrderPlacedEvent } from '../events/order-placed.event';
 
 const MOCK_ORDERS: OrderResponseDto[] = [
   {
@@ -72,6 +78,12 @@ const MOCK_ORDERS: OrderResponseDto[] = [
 @ApiTags('Orders')
 @Controller('orders')
 export class OrdersController {
+  private readonly logger = new Logger(OrdersController.name);
+
+  constructor(
+    @Optional() @Inject('RABBITMQ_CLIENT') private readonly rmqClient: ClientProxy | null,
+  ) {}
+
   @Get()
   @ApiOperation({ summary: 'Get paginated list of orders' })
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
@@ -88,15 +100,12 @@ export class OrdersController {
     @Query('page') page = 1,
     @Query('limit') limit = 10,
     @Query('status') status?: OrderStatus,
-    @Query('sort') sort?: string,
+    @Query('sort') _sort?: string,
     @Query('dateFrom') dateFrom?: string,
     @Query('dateTo') dateTo?: string,
     @Query('minPrice') minPrice?: number,
     @Query('maxPrice') maxPrice?: number,
   ): PaginatedOrdersResponseDto {
-    // Filtering logic (mock — in production: pass filters to repository query)
-    // dateFrom/dateTo: compare o.createdAt >= dateFrom && o.createdAt <= dateTo
-    // minPrice/maxPrice: compare o.totalPrice >= minPrice && o.totalPrice <= maxPrice
     let filtered = status
       ? MOCK_ORDERS.filter((o) => o.status === status)
       : [...MOCK_ORDERS];
@@ -135,8 +144,8 @@ export class OrdersController {
   @ApiResponse({ status: 400, type: ErrorResponseDto })
   @ApiResponse({ status: 401, type: ErrorResponseDto })
   @ApiResponse({ status: 409, type: ErrorResponseDto })
-  createOrder(@Body() dto: CreateOrderDto): OrderResponseDto {
-    return {
+  async createOrder(@Body() dto: CreateOrderDto): Promise<OrderResponseDto> {
+    const order: OrderResponseDto = {
       id: 'f3e4d5c6-b7a8-9012-f3e4-d5c6b7a89012',
       status: OrderStatus.PENDING,
       totalPrice: 27.98,
@@ -153,6 +162,26 @@ export class OrdersController {
         },
       ],
     };
+
+    const event: OrderPlacedEvent = {
+      orderId: order.id,
+      userEmail: 'customer@bookstorm.com',
+      totalPrice: order.totalPrice,
+      bookTitles: order.items.map((i) => i.bookTitle),
+      createdAt: order.createdAt,
+    };
+
+    try {
+      if (this.rmqClient) {
+        await lastValueFrom(this.rmqClient.emit('order.placed', event));
+      } else {
+        this.logger.warn('[RabbitMQ] Client not available — skipping event publish');
+      }
+    } catch (err) {
+      this.logger.warn(`[RabbitMQ] Failed to publish OrderPlacedEvent: ${(err as Error).message}`);
+    }
+
+    return order;
   }
 
   @Post('pre-order')

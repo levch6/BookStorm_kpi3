@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ClientsModule, Transport } from '@nestjs/microservices';
-import { OrdersController } from './orders.controller';
+import { NotificationConsumer } from './notification.consumer';
 
 @Module({
   imports: [
@@ -11,11 +11,12 @@ import { OrdersController } from './orders.controller';
         options: {
           urls: ['amqp://localhost:5672'],
           queue: 'order.placed',
+          noAck: false,
           queueOptions: { durable: true },
         },
       },
     ]),
   ],
-  controllers: [OrdersController],
+  controllers: [NotificationConsumer],
 })
-export class OrdersModule {}
+export class NotificationModule {}
