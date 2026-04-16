@@ -1,98 +1,130 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# BookStorm — Order Service
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+A demo NestJS microservice for the BookStorm book e-commerce platform. Handles orders and cart management with an event-driven notification flow via RabbitMQ.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Features
 
-## Description
+- **Orders** — create, list, get, cancel, confirm, and pre-order endpoints
+- **Cart** — cart management endpoints
+- **Event-Driven Architecture** — order creation publishes an `OrderPlacedEvent` to RabbitMQ; a notification consumer logs a simulated confirmation
+- **Swagger UI** — full API documentation at `/api`
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Architecture
 
-## Project setup
-
-```bash
-$ npm install
+```
+POST /api/v1/orders
+       │
+       ▼
+ OrdersController
+       │  publishes OrderPlacedEvent
+       ▼
+   RabbitMQ (queue: order.placed)
+       │
+       ▼
+ NotificationConsumer
+       │  logs simulated notification
+       ▼
+ [Notification] Order {id} confirmed for {email}. Total: {price} UAH. Books: {titles}
 ```
 
-## Compile and run the project
+## Prerequisites
+
+- Node.js 18+
+- Docker (for RabbitMQ)
+
+## Setup
+
+**1. Install dependencies**
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+npm install
 ```
 
-## Run tests
+**2. Start RabbitMQ**
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+docker run -d --name rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:3-management
 ```
 
-## Deployment
+RabbitMQ management UI: http://localhost:15672 (guest / guest)
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+**3. Start the app**
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+npm run start:dev
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+- API: http://localhost:3000/api/v1
+- Swagger: http://localhost:3000/api
 
-## Resources
+## API Overview
 
-Check out a few resources that may come in handy when working with NestJS:
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/orders` | List orders (paginated, filterable) |
+| GET | `/api/v1/orders/:id` | Get order by ID |
+| POST | `/api/v1/orders` | Create order → triggers RabbitMQ event |
+| POST | `/api/v1/orders/pre-order` | Create a pre-order |
+| POST | `/api/v1/orders/:id/cancel` | Cancel an order |
+| POST | `/api/v1/orders/:id/confirm` | Confirm an order |
+| GET | `/api/v1/cart` | Get cart |
+| POST | `/api/v1/cart` | Add item to cart |
+| GET | `/api/v1/events/info` | Event-driven flow description |
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+## Example: Trigger the Event Flow
 
-## Support
+```bash
+curl -X POST http://localhost:3000/api/v1/orders \
+  -H "Content-Type: application/json" \
+  -d '{
+    "cartId": "a1b2c3d4-e5f6-7890-a1b2-c3d4e5f67890",
+    "deliveryBranch": "Kyiv, Nova Poshta #1",
+    "paymentMethod": "stripe"
+  }'
+```
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+Expected console output:
 
-## Stay in touch
+```
+[NotificationConsumer] [Notification] Order f3e4d5c6-b7a8-9012-f3e4-d5c6b7a89012 confirmed for customer@bookstorm.com. Total: 27.98 UAH. Books: Atomic Habits
+```
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+> If RabbitMQ is not running, the order is still created and a warning is logged — no crash.
+
+## Project Structure
+
+```
+src/
+├── events/
+│   ├── order-placed.event.ts     # Event payload class
+│   ├── events.controller.ts      # GET /events/info
+│   └── events.module.ts
+├── notification/
+│   ├── notification.consumer.ts  # RabbitMQ consumer
+│   └── notification.module.ts
+├── orders/
+│   ├── orders.controller.ts      # Orders endpoints + event publisher
+│   └── orders.module.ts
+├── cart/
+│   └── cart.controller.ts
+├── dto/
+│   ├── order.dto.ts
+│   ├── cart.dto.ts
+│   └── common.dto.ts
+├── app.module.ts
+└── main.ts                       # Hybrid HTTP + RabbitMQ microservice
+```
+
+## Scripts
+
+```bash
+npm run start:dev   # development with watch
+npm run start       # production
+npm run test        # unit tests
+npm run test:e2e    # e2e tests
+npm run test:cov    # test coverage
+```
 
 ## License
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+MIT
